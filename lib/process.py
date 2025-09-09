@@ -49,7 +49,6 @@ def add_total_tax_quotation(df):
 
 def add_fx_rate_quotation_to_settlement(df):
     if 'NET_AMOUNT_QUOTATION' in df.columns and 'NET_AMOUNT_SETTLEMENT' in df.columns:
-        # Avoid division by zero
         df['FX_RATE_QUOTATION_TO_SETTLEMENT_NBIM'] = df['NET_AMOUNT_QUOTATION'] / df['NET_AMOUNT_SETTLEMENT'].replace(0, float('nan'))
     return df
 
@@ -115,8 +114,6 @@ def organize_columns(df):
     return df_renamed[final_columns]  
 
 def process_data(NBIM_file, custody_file):
-    from lib.rules import apply_rules
-    
     NBIM_df, custody_df = read_data(NBIM_file, custody_file)
     merged_df = merge_df(NBIM_df, custody_df)
     merged_df = convert_date_columns(merged_df)
@@ -124,5 +121,4 @@ def process_data(NBIM_file, custody_file):
     merged_df = add_total_tax_quotation(merged_df)
     merged_df = add_fx_rate_quotation_to_settlement(merged_df)
     merged_df = organize_columns(merged_df)
-    merged_df = apply_rules(merged_df)
     return merged_df
