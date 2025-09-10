@@ -2,7 +2,7 @@ import os
 import json
 from lib.data_preparation import process_data
 from lib.discrepancy_detection import detect_all_discrepancies
-from lib.classify import run_classification, build_classification_prompt
+from lib.break_classification_agent import classify_breaks 
 from lib.num_shares_agent import run_shares_agent, build_system_prompt as build_shares_system_prompt
 from lib.tax_agent import run_tax_agent, build_system_prompt as build_tax_system_prompt
 
@@ -18,12 +18,9 @@ def process_dividend_reconciliation(nbim_file=None, custody_file=None):
     for index, row in merged_df.iterrows():
         deviation = abs(row['NET_AMOUNT_SETTLEMENT_CSTD'] - row['NET_AMOUNT_SETTLEMENT_NBIM'])
         if deviation/row['NET_AMOUNT_SETTLEMENT_NBIM'] > 0.01:
-            # Run classification
-            message_config = build_classification_prompt(row)
-            classification_output = run_classification(message_config)
+            classification_output = classify_breaks(row)
             print("Classification output:")
             print(classification_output)
-            
 
             organisation_name = row['ORGANISATION_NAME']
             ticker = row['TICKER']
