@@ -1,11 +1,12 @@
-import os, json, re
+import os
+import json
 from anthropic import Anthropic
 
 client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 
-tools = [{"type": "web_search_20250305", "name": "web_search"}]
+TAX_RESEARCH_TOOLS = [{"type": "web_search_20250305", "name": "web_search"}]
 
-def build_system_prompt(classifier_explanation: str, organisation_name: str, ticker: str, ex_date_cstd: str) -> str:
+def build_tax_agent_prompt(classifier_explanation: str, organisation_name: str, ticker: str, ex_date_cstd: str) -> dict:
     prompt_text = f"""
     NBIM processes thousands of dividend events each year. For each event, NBIM calculates expected tax amounts based on their understanding of applicable tax rates, while the Custodian reports their own tax calculations. Sometimes these disagree, creating a "Tax Break."
     
@@ -56,16 +57,18 @@ def build_system_prompt(classifier_explanation: str, organisation_name: str, tic
         ],
     }
 
-def run_tax_agent(message_config: dict, model="claude-sonnet-4-20250514",) -> str:
+def resolve_tax_break(classifier_explanation: str, organisation_name: str, ticker: str, ex_date_cstd: str, model="claude-sonnet-4-20250514") -> str:
+
+    message_config = build_tax_agent_prompt(classifier_explanation, organisation_name, ticker, ex_date_cstd)
     conversation = message_config["messages"].copy()
     
-    msg = client.messages.create(
+    response = client.messages.create(
         model=model,
         max_tokens=600,
-        tools=tools,
+        tools=TAX_RESEARCH_TOOLS,
         system=message_config["system"],
         messages=conversation
     )
     
-    response_text = "".join([block.text for block in msg.content if getattr(block, "type", None) == "text"]).strip()
+    response_text = "".join([block.text for block in response.content if getattr(block, "type", None) == "text"]).strip()
     return response_text
