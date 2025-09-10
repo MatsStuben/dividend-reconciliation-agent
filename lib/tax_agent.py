@@ -37,7 +37,8 @@ def build_system_prompt(classifier_explanation: str, organisation_name: str, tic
 
     OUTPUT:
     Always return ONLY avalid JSON object with exactly these two fields, without any other text such as '''json'''.
-    Do not include any reasoning from a potential web search outside of the explanation field in the json.:
+    Do not include any reasoning from a potential web search outside of the explanation field in the json.
+    This is the ONLY output format you are allowed to use:
     {{
     "conclusion": "NEED_INFO | CUSTODY_WRONG | NBIM_WRONG",
     "explanation": "Self-contained, operator-ready summary that does not assume any prior context. 

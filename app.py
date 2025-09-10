@@ -1,6 +1,5 @@
 import os
 import json
-import time
 from lib.process_data import process_data
 from lib.rules import apply_rules
 from lib.classify import run_classification, build_classification_prompt
@@ -16,20 +15,26 @@ def main():
     print(f"Processing files: {nbim_file} and {custody_file}")
     merged_df = process_data(nbim_file, custody_file)
     merged_df = apply_rules(merged_df)
+    
+    results = {}
 
     for index, row in merged_df.iterrows():
-        if abs(row['NET_AMOUNT_SETTLEMENT_CSTD'] - row['NET_AMOUNT_SETTLEMENT_NBIM'])/row['NET_AMOUNT_SETTLEMENT_NBIM'] > 0.01:
+        deviation = abs(row['NET_AMOUNT_SETTLEMENT_CSTD'] - row['NET_AMOUNT_SETTLEMENT_NBIM'])
+        if deviation/row['NET_AMOUNT_SETTLEMENT_NBIM'] > 0.01:
             # Run classification
             message_config = build_classification_prompt(row)
             classification_output = run_classification(message_config)
             print("Classification output:")
             print(classification_output)
             
-            # Add small delay to avoid rate limits
 
             organisation_name = row['ORGANISATION_NAME']
             ticker = row['TICKER']
             ex_date_cstd = row['EX_DATE_CSTD']
+            coac_id = row['COAC_EVENT_KEY']
+            bank_account = row['CUSTODY']
+            settlement_currency = row['SETTLEMENT_CURRENCY_CSTD']
+
             try:
                 classification_data = json.loads(classification_output)
                 
@@ -51,7 +56,22 @@ def main():
                     shares_result = run_shares_agent(shares_message_config)
                     print("Shares agent result:")
                     print(shares_result)
-                    time.sleep(1)  # Delay between agents
+                    
+                    try:
+                        shares_data = json.loads(shares_result)
+                        results[(coac_id, bank_account)] = {
+                            'conclusion': shares_data.get('conclusion', 'NEED_INFO'),
+                            'explanation': shares_data.get('explanation', 'No explanation provided'),
+                            'deviation': deviation,
+                            'settlement_currency': settlement_currency
+                        }
+                    except json.JSONDecodeError:
+                        results[(coac_id, bank_account)] = {
+                            'conclusion': 'NEED_INFO',
+                            'explanation': 'Could not parse shares agent result',
+                            'deviation': deviation,
+                            'settlement_currency': settlement_currency
+                        }
                 
                 # Check for tax break
                 tax_break_found = any(
@@ -72,10 +92,45 @@ def main():
                     print("Tax agent result:")
                     print(tax_result)
                     
+                    try:
+                        tax_data = json.loads(tax_result)
+                        results[(coac_id, bank_account)] = {
+                            'conclusion': tax_data.get('conclusion', 'NEED_INFO'),
+                            'explanation': tax_data.get('explanation', 'No explanation provided'),
+                            'deviation': deviation,
+                            'settlement_currency': settlement_currency
+                        }
+                    except json.JSONDecodeError:
+                        results[(coac_id, bank_account)] = {
+                            'conclusion': 'NEED_INFO',
+                            'explanation': 'Could not parse tax agent result',
+                            'deviation': deviation,
+                            'settlement_currency': settlement_currency
+                        }
+                    
             except json.JSONDecodeError:
                 print("Could not parse classification output as JSON")
                 print("Raw output:", classification_output)
 
+    if results:
+        import pandas as pd
+        csv_data = []
+        for (coac_id, bank_account), data in results.items():
+            csv_data.append({
+                'coac_id': coac_id,
+                'bank_account': bank_account,
+                'conclusion': data['conclusion'],
+                'explanation': data['explanation'],
+                'deviation': data['deviation'],
+                'settlement_currency': data['settlement_currency']
+            })
+        
+        results_df = pd.DataFrame(csv_data)
+        output_path = os.path.join(data_folder, 'output.csv')
+        results_df.to_csv(output_path, index=False)
+        print(f"\nResults written to {output_path} with {len(results)} entries")
+    else:
+        print("\nNo results to write to CSV")
     
     return merged_df
 

@@ -31,7 +31,7 @@ def convert_date_columns(df):
 def remove_columns(df):
     columns_to_remove = [
         'ISIN_NBIM', 'ISIN_CSTD', 'SEDOL_NBIM', 'SEDOL_CSTD',
-        'CUSTODY', 'BANK_ACCOUNT', 'CUSTODIAN_NBIM', 'CUSTODIAN_CSTD',
+        'CUSTODIAN_NBIM', 'CUSTODIAN_CSTD',
         'EVENT_TYPE', 'BANK_ACCOUNTS', 'GROSS_AMOUNT_PORTFOLIO',
         'NET_AMOUNT_PORTFOLIO', 'WTHTAX_COST_PORTFOLIO', 'RECORD_DATE',
         'EX_DATE', 'PAY_DATE', 'AVG_FX_RATE_QUOTATION_TO_PORTFOLIO'
@@ -60,6 +60,7 @@ def organize_columns(df):
         'INSTRUMENT_DESCRIPTION': 'INSTRUMENT_DESCRIPTION',
         'TICKER': 'TICKER',
         'ORGANISATION_NAME': 'ORGANISATION_NAME',
+        'CUSTODY': 'CUSTODY',
         
        # Matching columns
         'EVENT_EX_DATE': 'EX_DATE_CSTD',
