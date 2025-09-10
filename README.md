@@ -25,3 +25,7 @@ A Streamlit-based application that automatically detects and resolves discrepanc
 3. **LLM-based Break Classification**: Uses an LLM agent that receives rule-based break suggestions, then applies domain knowledge and reasoning to validate these breaks, identify additional breaks, and provide detailed descriptions to help resolution agents solve the issues.
 4. **LLM-base Resolution**: Specialized agents resolve each break type using domain knowledge, reasoning, internal tools, and web search. Currently implemented for Shares and Tax breaks, with similar agents planned for DPS, FX, and "Other" break types.
 5. **Output**: Results saved to `data/output.csv` and displayed in the Streamlit dashboard.
+
+## Architecture Diagram
+
+![Agentic Framework](agentic-framework.png)
