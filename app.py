@@ -1,20 +1,17 @@
 import os
 import json
-from lib.process_data import process_data
-from lib.rules import apply_rules
+from lib.data_preparation import process_data
+from lib.discrepancy_detection import detect_all_discrepancies
 from lib.classify import run_classification, build_classification_prompt
 from lib.num_shares_agent import run_shares_agent, build_system_prompt as build_shares_system_prompt
 from lib.tax_agent import run_tax_agent, build_system_prompt as build_tax_system_prompt
 
 def process_dividend_reconciliation(nbim_file=None, custody_file=None):
     data_folder = "data"  
-    if nbim_file is None:
-        nbim_file = os.path.join(data_folder, "NBIM_Dividend_Bookings.csv")
-        custody_file = os.path.join(data_folder, "CUSTODY_Dividend_Bookings.csv")
     
     print(f"Processing files: {nbim_file} and {custody_file}")
     merged_df = process_data(nbim_file, custody_file)
-    merged_df = apply_rules(merged_df)
+    merged_df = detect_all_discrepancies(merged_df)
     
     results = {}
 
