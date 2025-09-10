@@ -119,7 +119,7 @@ TASK:
 • Return ONLY valid JSON in this exact format, without any other text such as '''json''':
 {{
   "problems": [
-    {{ "name": "Tax Break|Shares Break|DPS Break|FX Break|Other", "explanation": "Full but concise explanation for a human operator"}}
+    {{ "name": "Tax Break|Shares Break|DPS Break|FX Break|Other", "explanation": "Full but concise explanation for a human operator. Include the relevant input data provided to you."}}
   ]
 }}
 

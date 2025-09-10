@@ -49,7 +49,10 @@ def build_system_prompt(classifier_explanation: str, organisation_name: str, tic
     Always return a valid JSON object with exactly these two fields, without any other text such as '''json''':
     {{
     "conclusion": "NEED_INFO | CUSTODY_WRONG | NBIM_WRONG",
-    "explanation": "A short, factual explanation grounded only in the given evidence or tool outputs"
+    "explanation": "Self-contained, operator-ready summary that does not assume any prior context. 
+    Include the relevant input data provided to you, as well as any additional facts you retrieved using tools. 
+    Clearly state why these values lead you to the chosen conclusion. Be concise, factual, and avoid speculation."
+    "
     }}
     """
     return {
@@ -62,6 +65,7 @@ def build_system_prompt(classifier_explanation: str, organisation_name: str, tic
         ],
     }
 
+# Hardcoded results from the tools. In production, these would be replaced with actual data from the database, which is not available in this example.
 def tool_impl(name, args):
     if name == "get_position_on_date":
         ticker = args.get("TICKER", "Unknown")
@@ -98,23 +102,23 @@ def run_shares_agent(message_config: dict, model="claude-sonnet-4-20250514",) ->
         system=message_config["system"],
         messages=conversation
     )
-    
-    for _ in range(2):
-        uses = [b for b in msg.content if getattr(b, "type", None) == "tool_use"]
-        if not uses:
+    # Allow up to 2 tool-use cycles
+    for cycle in range(2):
+        tool_calls = [block for block in msg.content if getattr(block, "type", None) == "tool_use"]
+        if not tool_calls:
             break
             
         conversation.append({
             "role": "assistant",
-            "content": [{"type": "tool_use", "id": u.id, "name": u.name, "input": u.input} for u in uses]
+            "content": [{"type": "tool_use", "id": tool_call.id, "name": tool_call.name, "input": tool_call.input} for tool_call in tool_calls]
         })
         
-        for u in uses:
-            print(f'u.name, u.input: {u.name, u.input}')
-            res = tool_impl(u.name, u.input)
+        for tool_call in tool_calls:
+            print(f'Tool call: {tool_call.name} with input: {tool_call.input}')
+            tool_result = tool_impl(tool_call.name, tool_call.input)
             conversation.append({
                 "role": "user",
-                "content": [{"type": "tool_result", "tool_use_id": u.id, "content": json.dumps(res)}]
+                "content": [{"type": "tool_result", "tool_use_id": tool_call.id, "content": json.dumps(tool_result)}]
             })
         
         msg = client.messages.create(
@@ -125,5 +129,5 @@ def run_shares_agent(message_config: dict, model="claude-sonnet-4-20250514",) ->
             messages=conversation
         )
 
-    text = "".join([b.text for b in msg.content if getattr(b, "type", None) == "text"]).strip()
-    return text
+    response_text = "".join([block.text for block in msg.content if getattr(block, "type", None) == "text"]).strip()
+    return response_text
