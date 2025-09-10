@@ -1,9 +1,11 @@
 import os
 import json
+import time
 from lib.process_data import process_data
 from lib.rules import apply_rules
 from lib.classify import run_classification, build_classification_prompt
-from lib.num_shares_agent import run_shares_agent, build_system_prompt
+from lib.num_shares_agent import run_shares_agent, build_system_prompt as build_shares_system_prompt
+from lib.tax_agent import run_tax_agent, build_system_prompt as build_tax_system_prompt
 
 def main():
     data_folder = "data"
@@ -22,12 +24,16 @@ def main():
             classification_output = run_classification(message_config)
             print("Classification output:")
             print(classification_output)
+            
+            # Add small delay to avoid rate limits
 
             organisation_name = row['ORGANISATION_NAME']
             ticker = row['TICKER']
             ex_date_cstd = row['EX_DATE_CSTD']
             try:
                 classification_data = json.loads(classification_output)
+                
+                # Check for shares break
                 shares_break_found = any(
                     problem.get("name") == "Shares Break" 
                     for problem in classification_data.get("problems", [])
@@ -41,10 +47,30 @@ def main():
                         "Shares position break detected"
                     )
                     print("\nRunning shares agent...")
-                    shares_message_config = build_system_prompt(shares_explanation, organisation_name, ticker, ex_date_cstd)
+                    shares_message_config = build_shares_system_prompt(shares_explanation, organisation_name, ticker, ex_date_cstd)
                     shares_result = run_shares_agent(shares_message_config)
                     print("Shares agent result:")
                     print(shares_result)
+                    time.sleep(1)  # Delay between agents
+                
+                # Check for tax break
+                tax_break_found = any(
+                    problem.get("name") == "Tax Break" 
+                    for problem in classification_data.get("problems", [])
+                )
+                
+                if tax_break_found:
+                    tax_explanation = next(
+                        (problem.get("explanation", "") 
+                         for problem in classification_data.get("problems", [])
+                         if problem.get("name") == "Tax Break"),
+                        "Tax calculation break detected"
+                    )
+                    print("\nRunning tax agent...")
+                    tax_message_config = build_tax_system_prompt(tax_explanation, organisation_name, ticker, ex_date_cstd)
+                    tax_result = run_tax_agent(tax_message_config)
+                    print("Tax agent result:")
+                    print(tax_result)
                     
             except json.JSONDecodeError:
                 print("Could not parse classification output as JSON")
