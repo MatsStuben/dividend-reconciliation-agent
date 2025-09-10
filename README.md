@@ -28,4 +28,4 @@ A Streamlit-based application that automatically detects and resolves discrepanc
 
 ## Architecture Diagram
 
-![Agentic Framework](agentic-framework.png)
+![Agent Framework](agent-framework.png)
