@@ -45,7 +45,7 @@ def apply_breaks_flags(df: pd.DataFrame,
         if not gross_match:
             if not abs((dps_nbim - dps_cstd))/dps_nbim <= tol_percentage:
                 df.at[i, "BREAK_DPS"] = 1
-                
+
             implied_dps_match = abs(gross_nbim/dps_nbim - gross_cstd/dps_cstd) <= tol_percentage
             if not implied_dps_match:
                 df.at[i, "BREAK_SHARES"] = 1
@@ -54,7 +54,7 @@ def apply_breaks_flags(df: pd.DataFrame,
         if not implied_tax_rate_match:
             df.at[i, "BREAK_TAX"] = 1
         
-        if not abs((fx_nbim - fx_cstd)) <= tol_percentage:
+        if not abs((fx_nbim - fx_cstd)/fx_nbim) <= tol_percentage:
             df.at[i, "BREAK_FX"] = 1
 
     return df
