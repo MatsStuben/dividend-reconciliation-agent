@@ -6,6 +6,7 @@ from lib.discrepancy_detection import detect_all_discrepancies
 from lib.break_classification_agent import classify_breaks 
 from lib.shares_break_resolver_agent import resolve_shares_break
 from lib.tax_break_resolver_agent import resolve_tax_break
+from lib.prioritization_agent import add_priorities_to_results
 
 def _process_break(break_type: str, explanation: str, organisation_name: str, ticker: str, ex_date_cstd: str) -> dict:
     """Process a specific break type using the appropriate agent."""
@@ -43,7 +44,9 @@ def _save_results(results: dict, data_folder: str = "data") -> None:
             'conclusion': data['conclusion'],
             'explanation': data['explanation'],
             'deviation': data['deviation'],
-            'settlement_currency': data['settlement_currency']
+            'settlement_currency': data['settlement_currency'],
+            'execution_date': data['execution_date'],
+            'priority': data.get('priority', 'N/A')
         })
     
     results_df = pd.DataFrame(csv_data)
@@ -81,7 +84,9 @@ def process_dividend_reconciliation(nbim_file=None, custody_file=None):
             'coac_id': row['COAC_EVENT_KEY'],
             'bank_account': row['CUSTODY'],
             'settlement_currency': row['SETTLEMENT_CURRENCY_CSTD'],
-            'deviation': deviation
+            'deviation': deviation,
+            'currency': row['SETTLEMENT_CURRENCY_CSTD'],
+            'execution_date': row['EX_DATE_CSTD'].strftime('%Y-%m-%d') if pd.notna(row['EX_DATE_CSTD']) else "2024-01-01"
         }
         
         try:
@@ -104,12 +109,15 @@ def process_dividend_reconciliation(nbim_file=None, custody_file=None):
                     'conclusion': agent_result.get('conclusion', 'NEED_INFO'),
                     'explanation': agent_result.get('explanation', 'No explanation provided'),
                     'deviation': row_data['deviation'],
-                    'settlement_currency': row_data['settlement_currency']
+                    'settlement_currency': row_data['settlement_currency'],
+                    'execution_date': row_data['execution_date']
                 }
                 
         except json.JSONDecodeError:
             print("Could not parse classification output as JSON")
             print("Raw output:", breaks_raw)
+    
+    results = add_priorities_to_results(results)
     
     _save_results(results)
     

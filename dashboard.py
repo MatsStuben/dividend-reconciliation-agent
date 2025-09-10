@@ -65,6 +65,12 @@ output_file = "data/output.csv"
 if os.path.exists(output_file):
     try:
         output_df = pd.read_csv(output_file)
+        
+        if 'priority' in output_df.columns:
+            output_df['priority_numeric'] = pd.to_numeric(output_df['priority'], errors='coerce')
+            output_df = output_df.sort_values('priority_numeric', ascending=True)  # 1 = highest priority
+            output_df = output_df.drop('priority_numeric', axis=1)  # Remove helper column
+        
         st.dataframe(output_df, use_container_width=True)
         
         csv = output_df.to_csv(index=False)
