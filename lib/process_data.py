@@ -1,16 +1,18 @@
 import pandas as pd
 from datetime import datetime
 
-def read_data(NBIM_file, custody_file):
-    NBIM_df = pd.read_csv(NBIM_file, sep=';')
+def load_csv_files(nbim_file, custody_file):
+    nbim_df = pd.read_csv(nbim_file, sep=';')
     custody_df = pd.read_csv(custody_file, sep=';')
-    return NBIM_df, custody_df
+    return nbim_df, custody_df
 
-def merge_df(NBIM_df, custody_df):
-    NBIM_df = NBIM_df.rename(columns={'BANK_ACCOUNT': 'CUSTODY'})
+def merge_dataframes(nbim_df, custody_df):
+    # Rename BANK_ACCOUNT to CUSTODY for consistent merging
+    nbim_df = nbim_df.rename(columns={'BANK_ACCOUNT': 'CUSTODY'})
     
+    # Merge with outer join to keep all records
     merged_df = pd.merge(
-        NBIM_df, 
+        nbim_df, 
         custody_df, 
         on=['COAC_EVENT_KEY', 'CUSTODY'], 
         how='outer',
@@ -18,11 +20,12 @@ def merge_df(NBIM_df, custody_df):
         suffixes=('_NBIM', '_CSTD') 
     )
     
+    # Add flag for unmatched records
     merged_df['NO_MATCH_FLAG'] = merged_df['_merge'] != 'both'
     merged_df.drop(columns=['_merge'], inplace=True)
     return merged_df
 
-def convert_date_columns(df):
+def convert_dates(df):
     for col in df.columns:
         if 'DATE' in col.upper():
             df[col] = pd.to_datetime(df[col], format='%d.%m.%Y', errors='coerce')
@@ -38,18 +41,17 @@ def remove_columns(df):
     ]
     
     existing_columns = [col for col in columns_to_remove if col in df.columns]
-    df_cleaned = df.drop(columns=existing_columns)
-    
-    return df_cleaned
+    return df.drop(columns=existing_columns)
 
-def add_total_tax_quotation(df):
+def add_calculated_fields(df):
+    """Add calculated fields for tax and FX rates missing in the NBIM file."""
+
     if 'LOCALTAX_COST_QUOTATION' in df.columns and 'WTHTAX_COST_QUOTATION' in df.columns:
         df['TOTAL_TAX_QUOTATION_NBIM'] = df['LOCALTAX_COST_QUOTATION'] + df['WTHTAX_COST_QUOTATION']
-    return df
-
-def add_fx_rate_quotation_to_settlement(df):
+    
     if 'NET_AMOUNT_QUOTATION' in df.columns and 'NET_AMOUNT_SETTLEMENT' in df.columns:
         df['FX_RATE_QUOTATION_TO_SETTLEMENT_NBIM'] = df['NET_AMOUNT_QUOTATION'] / df['NET_AMOUNT_SETTLEMENT'].replace(0, float('nan'))
+    
     return df
 
 def organize_columns(df):
@@ -114,15 +116,27 @@ def organize_columns(df):
     
     return df_renamed[final_columns]  
 
-def process_data(NBIM_file, custody_file):
-    from lib.rules import apply_rules
+def process_data(nbim_file, custody_file):
+    """
+    Main function to process NBIM and Custody dividend data.
     
-    NBIM_df, custody_df = read_data(NBIM_file, custody_file)
-    merged_df = merge_df(NBIM_df, custody_df)
-    merged_df = convert_date_columns(merged_df)
+    Steps:
+    1. Load CSV files
+    2. Merge data on common keys
+    3. Convert date columns
+    4. Clean unnecessary columns
+    5. Add calculated fields originally missing in the NBIM file
+    6. Standardize column names and order to make it easier for LLM to analyze
+    
+    Returns:
+        pd.DataFrame: Processed and merged data
+    """
+    
+    nbim_df, custody_df = load_csv_files(nbim_file, custody_file)
+    merged_df = merge_dataframes(nbim_df, custody_df)
+    merged_df = convert_dates(merged_df)
     merged_df = remove_columns(merged_df)
-    merged_df = add_total_tax_quotation(merged_df)
-    merged_df = add_fx_rate_quotation_to_settlement(merged_df)
+    merged_df = add_calculated_fields(merged_df)
     merged_df = organize_columns(merged_df)
-    merged_df = apply_rules(merged_df)
+    
     return merged_df
