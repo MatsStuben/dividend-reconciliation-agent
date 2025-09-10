@@ -1,8 +1,10 @@
-import os, json, re
+import os
+import json
 from anthropic import Anthropic
+
 client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 
-tools = [
+SHARES_AGENT_TOOLS = [
     {
         "name": "get_position_on_date",
         "description": "Return NBIM position for a given TICKER and date",
@@ -29,7 +31,8 @@ tools = [
     }
 ]
 
-def build_system_prompt(classifier_explanation: str, organisation_name: str, ticker: str, ex_date_cstd: str) -> str:
+def build_shares_agent_prompt(classifier_explanation: str, organisation_name: str, ticker: str, ex_date_cstd: str) -> dict:
+
     prompt_text = f"""
     NBIM processes thousands of dividend events each year. For each event, NBIM has an internally expected number of shares entitled to dividends, while the Custodian reports their own booked position. Sometimes these disagree, creating a "Shares Position Break."
     
@@ -45,6 +48,7 @@ def build_system_prompt(classifier_explanation: str, organisation_name: str, tic
     - Custody's booked position is wrong,
     - NBIM's expected position is wrong, or
     - There is not enough information to decide (NEED_INFO).
+    
     OUTPUT:
     Always return a valid JSON object with exactly these two fields, without any other text such as '''json''':
     {{
@@ -55,6 +59,7 @@ def build_system_prompt(classifier_explanation: str, organisation_name: str, tic
     "
     }}
     """
+    
     return {
         "system": (
             "You are NBIM's Shares Position Remediation Agent. "
@@ -65,19 +70,25 @@ def build_system_prompt(classifier_explanation: str, organisation_name: str, tic
         ],
     }
 
-# Hardcoded results from the tools. In production, these would be replaced with actual data from the database, which is not available in this example.
-def tool_impl(name, args):
-    if name == "get_position_on_date":
-        ticker = args.get("TICKER", "Unknown")
-        date = args.get("date", "Unknown")
+def _execute_tool(tool_name: str, tool_args: dict) -> dict:
+    """
+    Execute a tool call and return mock data.
+    
+    In production, this would query actual databases/systems.
+    For this demo, we return hardcoded mock data.
+    """
+    if tool_name == "get_position_on_date":
+        ticker = tool_args.get("TICKER", "Unknown")
+        date = tool_args.get("date", "Unknown")
         return {
             "position": 12000,
             "ticker": ticker,
             "date": date,
         }
-    if name == "get_settlement_movements":
-        ticker = args.get("TICKER", "Unknown")
-        date = args.get("date", "Unknown")
+    
+    elif tool_name == "get_settlement_movements":
+        ticker = tool_args.get("TICKER", "Unknown")
+        date = tool_args.get("date", "Unknown")
         return {
             "ticker": ticker,
             "date": date,
@@ -90,21 +101,25 @@ def tool_impl(name, args):
                 }
             ]
         }
+    
     return {}
  
-def run_shares_agent(message_config: dict, model="claude-sonnet-4-20250514",) -> str:
+def resolve_shares_break(classifier_explanation: str, organisation_name: str, ticker: str, ex_date_cstd: str, model="claude-sonnet-4-20250514") -> str:
+
+    message_config = build_shares_agent_prompt(classifier_explanation, organisation_name, ticker, ex_date_cstd)
     conversation = message_config["messages"].copy()
     
-    msg = client.messages.create(
+    response = client.messages.create(
         model=model,
         max_tokens=1000,
-        tools=tools,
+        tools=SHARES_AGENT_TOOLS,
         system=message_config["system"],
         messages=conversation
     )
-    # Allow up to 2 tool-use cycles
+    
+    # Handle tool use cycles (up to 2 iterations)
     for cycle in range(2):
-        tool_calls = [block for block in msg.content if getattr(block, "type", None) == "tool_use"]
+        tool_calls = [block for block in response.content if getattr(block, "type", None) == "tool_use"]
         if not tool_calls:
             break
             
@@ -115,19 +130,19 @@ def run_shares_agent(message_config: dict, model="claude-sonnet-4-20250514",) ->
         
         for tool_call in tool_calls:
             print(f'Tool call: {tool_call.name} with input: {tool_call.input}')
-            tool_result = tool_impl(tool_call.name, tool_call.input)
+            tool_result = _execute_tool(tool_call.name, tool_call.input)
             conversation.append({
                 "role": "user",
                 "content": [{"type": "tool_result", "tool_use_id": tool_call.id, "content": json.dumps(tool_result)}]
             })
         
-        msg = client.messages.create(
+        response = client.messages.create(
             model=model,
             max_tokens=600,
-            tools=tools,
+            tools=SHARES_AGENT_TOOLS,
             system=message_config["system"],
             messages=conversation
         )
 
-    response_text = "".join([block.text for block in msg.content if getattr(block, "type", None) == "text"]).strip()
+    response_text = "".join([block.text for block in response.content if getattr(block, "type", None) == "text"]).strip()
     return response_text

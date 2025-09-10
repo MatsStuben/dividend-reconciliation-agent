@@ -3,7 +3,7 @@ import json
 from lib.data_preparation import process_data
 from lib.discrepancy_detection import detect_all_discrepancies
 from lib.break_classification_agent import classify_breaks 
-from lib.num_shares_agent import run_shares_agent, build_system_prompt as build_shares_system_prompt
+from lib.shares_break_resolver_agent import resolve_shares_break
 from lib.tax_agent import run_tax_agent, build_system_prompt as build_tax_system_prompt
 
 def process_dividend_reconciliation(nbim_file=None, custody_file=None):
@@ -46,8 +46,7 @@ def process_dividend_reconciliation(nbim_file=None, custody_file=None):
                         "Shares position break detected"
                     )
                     print("\nRunning shares agent...")
-                    shares_message_config = build_shares_system_prompt(shares_explanation, organisation_name, ticker, ex_date_cstd)
-                    shares_result = run_shares_agent(shares_message_config)
+                    shares_result = resolve_shares_break(shares_explanation, organisation_name, ticker, ex_date_cstd)
                     print("Shares agent result:")
                     print(shares_result)
                     
